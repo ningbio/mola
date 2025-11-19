@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SVG Path Animator</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"
+    ></script>
+    <script defer type="module" src="./main.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Playground</p>
+          <h1>Yoyo's Path Animator</h1>
+          <p>
+            Load a vector asset, shape a motion curve directly on the canvas,
+            and export the animation as a GIF.
+          </p>
+        </div>
+        <div class="header-actions">
+          <button id="animateBtn" class="primary">Animate</button>
+          <button id="exportGifBtn">Export GIF</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="controls panel">
+          <fieldset>
+            <legend>Artwork</legend>
+            <label class="file-input">
+              <span>Load SVG or PNG</span>
+              <input
+                type="file"
+                id="artInput"
+                accept=".svg,.png,image/svg+xml,image/png"
+              />
+            </label>
+            <div class="field">
+              <label for="scaleSlider">Scale</label>
+              <div class="range-line">
+                <input
+                  id="scaleSlider"
+                  type="range"
+                  min="0.2"
+                  max="3"
+                  step="0.05"
+                  value="1"
+                />
+                <span id="scaleValue">1.0×</span>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Motion</legend>
+            <div class="field">
+              <label for="speedSlider">Playback speed</label>
+              <div class="range-line">
+                <input
+                  id="speedSlider"
+                  type="range"
+                  min="0.2"
+                  max="3"
+                  step="0.05"
+                  value="1"
+                />
+                <span id="speedValue">1.0×</span>
+              </div>
+            </div>
+            <div class="field">
+              <button id="resetCurveBtn" type="button">Reset curve</button>
+            </div>
+            <div class="field checkbox-field">
+              <label>
+                <input type="checkbox" id="loopToggle" checked />
+                <span>Loop animation</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <section class="instructions panel">
+            <h2>How to use</h2>
+            <ol>
+              <li>Drag any control point to sculpt the cubic Bézier path.</li>
+              <li>Load your SVG or PNG and adjust its scale.</li>
+              <li>Tap <strong>Animate</strong> to preview the motion.</li>
+              <li>Export the loop as a GIF whenever you like.</li>
+            </ol>
+            <p class="note">
+              Tip: Hold and drag on either of the middle handles to fine‑tune
+              the tangents.
+            </p>
+          </section>
+        </section>
+
+        <section class="stage panel">
+          <canvas id="viewport" width="960" height="600"></canvas>
+          <div class="status-bar" id="statusBar">
+            Drop in an SVG or PNG, or start shaping the default path.
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
+
