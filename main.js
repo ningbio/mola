@@ -11,35 +11,45 @@ const animateBtn = document.getElementById("animateBtn");
 const exportGifBtn = document.getElementById("exportGifBtn");
 const resetCurveBtn = document.getElementById("resetCurveBtn");
 const loopToggle = document.getElementById("loopToggle");
+const setListEl = document.getElementById("setList");
+const addMolaBtn = document.getElementById("addMolaBtn");
+const addJellyBtn = document.getElementById("addJellyBtn");
 
 canvas.style.touchAction = "none";
 
 const GIF_WORKER_SRC =
   "https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js";
-const DEFAULT_ART_URL = "./mola.png";
+
+const PRESET_ARTWORKS = {
+  mola: {
+    label: "Mola",
+    fileName: "mola.png",
+    url: "./mola.png",
+    type: "png",
+    scale: 1,
+  },
+  jelly: {
+    label: "Jelly",
+    fileName: "jelly.png",
+    url: "./jelly.png",
+    type: "png",
+    scale: 1,
+  },
+};
 
 const state = {
-  controlPoints: [],
+  sets: [],
+  activeSetId: null,
+  setCounter: 0,
+  presetCounts: {},
   draggingPointIndex: null,
   currentProgress: 0,
-  arcTable: [],
-  totalArcLength: 0,
   isAnimating: false,
   animationStart: 0,
   animationDuration: 6000,
   rafId: null,
   baseDuration: 6000,
   playbackSpeed: 1,
-  artScale: 1,
-  artAsset: {
-    ready: false,
-    width: 120,
-    height: 120,
-    name: "placeholder",
-    type: "placeholder",
-    image: null,
-  },
-  userProvidedAsset: false,
   gifWorkerUrl: null,
   gifWorkerPromise: null,
   loopAnimation: true,
@@ -52,18 +62,117 @@ const DEFAULT_POINTS = [
   { x: canvas.width - 80, y: 100 },
 ];
 
+function createEmptyArtAsset() {
+  return {
+    ready: false,
+    width: 120,
+    height: 120,
+    name: "placeholder",
+    type: "placeholder",
+    image: null,
+  };
+}
+
+function createAnimationSet(name) {
+  state.setCounter += 1;
+  return {
+    id: `set-${state.setCounter}`,
+    name: name || `Set ${state.setCounter}`,
+    controlPoints: DEFAULT_POINTS.map((pt) => ({ ...pt })),
+    arcTable: [],
+    totalArcLength: 0,
+    artScale: 1,
+    artAsset: createEmptyArtAsset(),
+    color: `hsl(${(state.setCounter * 70) % 360}deg 70% 60%)`,
+  };
+}
+
+function getActiveSet() {
+  return state.sets.find((set) => set.id === state.activeSetId) || null;
+}
+
+function addAnimationSet({ name, activate = true } = {}) {
+  const set = createAnimationSet(name);
+  state.sets.push(set);
+  buildArcTable(set);
+  if (!state.activeSetId || activate) {
+    state.activeSetId = set.id;
+  }
+  renderSetList();
+  syncControlsToActiveSet();
+  renderScene();
+  return set;
+}
+
+function setActiveSet(setId) {
+  if (state.activeSetId === setId) {
+    return;
+  }
+  state.activeSetId = setId;
+  state.draggingPointIndex = null;
+  renderSetList();
+  syncControlsToActiveSet();
+  renderScene();
+}
+
+function renderSetList() {
+  if (!setListEl) return;
+  setListEl.innerHTML = "";
+  if (!state.sets.length) {
+    const emptyLi = document.createElement("li");
+    emptyLi.className = "set-meta";
+    emptyLi.textContent = "No sets yet. Use the buttons above to add one.";
+    setListEl.appendChild(emptyLi);
+    return;
+  }
+  state.sets.forEach((set) => {
+    const li = document.createElement("li");
+    li.className = "set-item";
+    li.dataset.id = set.id;
+    li.dataset.active = String(set.id === state.activeSetId);
+
+    const swatch = document.createElement("span");
+    swatch.className = "set-color";
+    swatch.style.background = set.color;
+
+    const label = document.createElement("button");
+    label.type = "button";
+    label.textContent = set.name;
+
+    const meta = document.createElement("span");
+    meta.className = "set-meta";
+    meta.textContent = set.artAsset.ready ? set.artAsset.name : "Placeholder art";
+
+    li.appendChild(swatch);
+    li.appendChild(label);
+    li.appendChild(meta);
+    li.addEventListener("click", () => setActiveSet(set.id));
+    setListEl.appendChild(li);
+  });
+}
+
+function syncControlsToActiveSet() {
+  const set = getActiveSet();
+  if (!set) {
+    scaleSlider.disabled = true;
+    artInput.disabled = true;
+    scaleValue.textContent = "—";
+    return;
+  }
+  scaleSlider.disabled = false;
+  artInput.disabled = false;
+  scaleSlider.value = String(set.artScale);
+  scaleValue.textContent = `${set.artScale.toFixed(2)}×`;
+}
+
 init();
 
 function init() {
-  state.controlPoints = DEFAULT_POINTS.map((pt) => ({ ...pt }));
-  buildArcTable();
   attachEventListeners();
-  handleScaleChange({ target: scaleSlider });
   handleSpeedChange({ target: speedSlider });
   loopToggle.checked = state.loopAnimation;
-  renderScene();
-  setStatus("Drop in an SVG or PNG, or start shaping the default path.");
-  preloadDefaultArtwork();
+  handleAddPresetSet("mola", { silent: true });
+  setStatus("Drop in artwork, add more sets, and choreograph them together.");
 }
 
 function attachEventListeners() {
@@ -71,6 +180,8 @@ function attachEventListeners() {
   scaleSlider.addEventListener("input", handleScaleChange);
   speedSlider.addEventListener("input", handleSpeedChange);
   loopToggle.addEventListener("change", handleLoopToggle);
+  addMolaBtn.addEventListener("click", () => handleAddPresetSet("mola"));
+  addJellyBtn.addEventListener("click", () => handleAddPresetSet("jelly"));
   animateBtn.addEventListener("click", toggleAnimation);
   exportGifBtn.addEventListener("click", exportGif);
   resetCurveBtn.addEventListener("click", resetCurve);
@@ -82,6 +193,11 @@ function attachEventListeners() {
 }
 
 async function handleAssetUpload(event) {
+  const targetSet = getActiveSet();
+  if (!targetSet) {
+    setStatus("Create an animation set before loading artwork.", "error");
+    return;
+  }
   const file = event.target.files?.[0];
   if (!file) {
     return;
@@ -95,8 +211,6 @@ async function handleAssetUpload(event) {
     return;
   }
 
-  state.userProvidedAsset = true;
-
   try {
     if (isSvg) {
       const text = await file.text();
@@ -104,7 +218,7 @@ async function handleAssetUpload(event) {
       const dimensions = extractSvgSize(sanitizedSvg);
       const svgBlob = new Blob([sanitizedSvg], { type: "image/svg+xml" });
       const image = await loadImageFromBlob(svgBlob);
-      setArtAsset({
+      setArtAsset(targetSet, {
         image,
         width: dimensions.width || image.naturalWidth || 140,
         height: dimensions.height || image.naturalHeight || 140,
@@ -113,7 +227,7 @@ async function handleAssetUpload(event) {
       });
     } else {
       const image = await loadImageFromBlob(file);
-      setArtAsset({
+      setArtAsset(targetSet, {
         image,
         width: image.naturalWidth || 512,
         height: image.naturalHeight || 512,
@@ -124,7 +238,8 @@ async function handleAssetUpload(event) {
 
     state.currentProgress = 0;
     renderScene();
-    setStatus(`Loaded ${file.name}`, "success");
+    renderSetList();
+    setStatus(`Loaded ${file.name} into ${targetSet.name}`, "success");
   } catch (error) {
     console.error(error);
     setStatus("Could not load that file. Try another?", "error");
@@ -205,39 +320,17 @@ function loadImageFromUrl(url) {
   });
 }
 
-function setArtAsset({ image, width, height, name, type }) {
-  state.artAsset.image = image;
-  state.artAsset.width = width;
-  state.artAsset.height = height;
-  state.artAsset.name = name;
-  state.artAsset.type = type;
-  state.artAsset.ready = true;
-}
-
-async function preloadDefaultArtwork() {
-  try {
-    const image = await loadImageFromUrl(DEFAULT_ART_URL);
-    if (state.userProvidedAsset) {
-      return;
-    }
-    if (!image?.naturalWidth || !image?.naturalHeight) {
-      throw new Error("Default image missing dimensions");
-    }
-    setArtAsset({
-      image,
-      width: image.naturalWidth,
-      height: image.naturalHeight,
-      name: "mola.png",
-      type: "png",
-    });
-    scaleSlider.value = "1";
-    state.artScale = 1;
-    scaleValue.textContent = "1.00×";
-    renderScene();
-    setStatus("Default artwork loaded. Drop in a new SVG or PNG anytime.");
-  } catch (error) {
-    console.warn("Could not load default artwork", error);
+function setArtAsset(targetSet, { image, width, height, name, type }) {
+  targetSet.artAsset.image = image;
+  targetSet.artAsset.width = width;
+  targetSet.artAsset.height = height;
+  targetSet.artAsset.name = name;
+  targetSet.artAsset.type = type;
+  targetSet.artAsset.ready = true;
+  if (targetSet.id === state.activeSetId) {
+    syncControlsToActiveSet();
   }
+  renderSetList();
 }
 
 function ensureGifWorkerUrl() {
@@ -417,7 +510,12 @@ function enforceTransparentBackground(svgEl) {
 
 function handleScaleChange(event) {
   const value = Number(event.target.value);
-  state.artScale = value;
+  const set = getActiveSet();
+  if (!set) {
+    scaleValue.textContent = "—";
+    return;
+  }
+  set.artScale = value;
   scaleValue.textContent = `${value.toFixed(2)}×`;
   renderScene();
 }
@@ -437,6 +535,44 @@ function handleSpeedChange(event) {
 
 function handleLoopToggle(event) {
   state.loopAnimation = Boolean(event.target.checked);
+}
+
+function handleAddPresetSet(key, options = {}) {
+  const preset = PRESET_ARTWORKS[key];
+  if (!preset) {
+    console.warn(`Unknown preset key: ${key}`);
+    return;
+  }
+  const { silent = false } = options;
+  state.presetCounts[key] = (state.presetCounts[key] || 0) + 1;
+  const suffix = state.presetCounts[key] > 1 ? ` ${state.presetCounts[key]}` : "";
+  const label = `${preset.label}${suffix}`;
+  const set = addAnimationSet({ name: label });
+  set.artScale = preset.scale ?? 1;
+  syncControlsToActiveSet();
+  renderScene();
+
+  loadImageFromUrl(preset.url)
+    .then((image) => {
+      if (!image?.naturalWidth || !image?.naturalHeight) {
+        throw new Error("Preset image missing dimensions.");
+      }
+      setArtAsset(set, {
+        image,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        name: preset.fileName,
+        type: preset.type,
+      });
+      renderScene();
+      if (!silent) {
+        setStatus(`${set.name} loaded with ${preset.fileName}.`, "success");
+      }
+    })
+    .catch((error) => {
+      console.error(error);
+      setStatus(`Could not load ${preset.fileName}.`, "error");
+    });
 }
 
 function toggleAnimation() {
@@ -497,17 +633,23 @@ function stepAnimation(timestamp) {
 }
 
 function resetCurve() {
-  state.controlPoints = DEFAULT_POINTS.map((pt) => ({ ...pt }));
+  const set = getActiveSet();
+  if (!set) {
+    setStatus("No active set to reset.", "error");
+    return;
+  }
+  set.controlPoints = DEFAULT_POINTS.map((pt) => ({ ...pt }));
+  buildArcTable(set);
   state.currentProgress = 0;
-  buildArcTable();
-  stopAnimation();
   renderScene();
-  setStatus("Curve reset to default.", "success");
+  setStatus(`${set.name} curve reset to default.`, "success");
 }
 
 function onPointerDown(event) {
+  const set = getActiveSet();
+  if (!set) return;
   const pos = getCanvasCoordinates(event);
-  const hitIndex = findHandleIndex(pos);
+  const hitIndex = findHandleIndex(set, pos);
   if (hitIndex === null) {
     return;
   }
@@ -518,9 +660,11 @@ function onPointerDown(event) {
 
 function onPointerMove(event) {
   if (state.draggingPointIndex === null) return;
+  const set = getActiveSet();
+  if (!set) return;
   const pos = clampToCanvas(getCanvasCoordinates(event));
-  state.controlPoints[state.draggingPointIndex] = pos;
-  buildArcTable();
+  set.controlPoints[state.draggingPointIndex] = pos;
+  buildArcTable(set);
   renderScene();
 }
 
@@ -530,10 +674,10 @@ function onPointerUp(event) {
   canvas.releasePointerCapture?.(event.pointerId);
 }
 
-function findHandleIndex(position) {
+function findHandleIndex(set, position) {
   const radius = 18;
-  for (let i = 0; i < state.controlPoints.length; i += 1) {
-    const point = state.controlPoints[i];
+  for (let i = 0; i < set.controlPoints.length; i += 1) {
+    const point = set.controlPoints[i];
     if (distance(point, position) <= radius) {
       return i;
     }
@@ -558,27 +702,27 @@ function clampToCanvas(point) {
   };
 }
 
-function buildArcTable() {
+function buildArcTable(set) {
   const steps = 300;
   const table = [];
-  let lastPoint = cubicBezierPoint(0);
+  let lastPoint = cubicBezierPoint(set, 0);
   let length = 0;
   table.push({ t: 0, length, x: lastPoint.x, y: lastPoint.y });
 
   for (let i = 1; i <= steps; i += 1) {
     const t = i / steps;
-    const point = cubicBezierPoint(t);
+    const point = cubicBezierPoint(set, t);
     length += distance(point, lastPoint);
     table.push({ t, length, x: point.x, y: point.y });
     lastPoint = point;
   }
 
-  state.arcTable = table;
-  state.totalArcLength = length;
+  set.arcTable = table;
+  set.totalArcLength = length;
 }
 
-function cubicBezierPoint(t) {
-  const [p0, p1, p2, p3] = state.controlPoints;
+function cubicBezierPoint(set, t) {
+  const [p0, p1, p2, p3] = set.controlPoints;
   const mt = 1 - t;
   const mt2 = mt * mt;
   const t2 = t * t;
@@ -595,14 +739,14 @@ function cubicBezierPoint(t) {
   return { x, y };
 }
 
-function getPointAtProgress(progress) {
-  if (!state.arcTable.length) {
-    buildArcTable();
+function getPointAtProgress(set, progress) {
+  if (!set.arcTable.length) {
+    buildArcTable(set);
   }
-  const targetLength = progress * state.totalArcLength;
-  const table = state.arcTable;
+  const targetLength = progress * set.totalArcLength;
+  const table = set.arcTable;
   if (!Number.isFinite(targetLength) || table.length === 0) {
-    return { point: { ...state.controlPoints[0] }, t: 0 };
+    return { point: { ...set.controlPoints[0] }, t: 0 };
   }
 
   let low = 0;
@@ -637,9 +781,9 @@ function renderScene(targetCtx = ctx, options = {}) {
     showCurve = true,
     showBackdrop = true,
   } = options;
-  const { point, t } = getPointAtProgress(progress);
   const context = targetCtx;
   const { width, height } = context.canvas;
+  const activeSet = getActiveSet();
 
   context.save();
   context.clearRect(0, 0, width, height);
@@ -647,12 +791,21 @@ function renderScene(targetCtx = ctx, options = {}) {
     drawBackdrop(context, width, height);
   }
   if (showCurve) {
-    drawCurve(context);
+    state.sets.forEach((set) => {
+      const isActive = activeSet && set.id === activeSet.id;
+      drawCurve(context, set, isActive);
+    });
   }
-  if (showHandles) {
-    drawHandles(context);
+
+  state.sets.forEach((set) => {
+    const { point, t } = getPointAtProgress(set, progress);
+    const highlight = showHandles && activeSet && set.id === activeSet.id;
+    drawPayload(context, set, point, t, highlight);
+  });
+
+  if (showHandles && activeSet) {
+    drawHandles(context, activeSet);
   }
-  drawPayload(context, point, t, showHandles);
   context.restore();
 }
 
@@ -674,34 +827,36 @@ function drawBackdrop(context, width, height) {
   context.setLineDash([]);
 }
 
-function drawCurve(context) {
-  const [p0, p1, p2, p3] = state.controlPoints;
-  context.lineWidth = 4;
-  context.strokeStyle = "rgba(99, 179, 255, 0.9)";
+function drawCurve(context, set, isActive) {
+  const [p0, p1, p2, p3] = set.controlPoints;
+  context.lineWidth = isActive ? 4 : 2.5;
+  context.strokeStyle = isActive ? set.color : "rgba(255, 255, 255, 0.25)";
   context.beginPath();
   context.moveTo(p0.x, p0.y);
   context.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
   context.stroke();
 
-  context.save();
-  context.setLineDash([8, 10]);
-  context.lineWidth = 1.5;
-  context.strokeStyle = "rgba(255, 255, 255, 0.2)";
-  context.beginPath();
-  context.moveTo(p0.x, p0.y);
-  context.lineTo(p1.x, p1.y);
-  context.lineTo(p2.x, p2.y);
-  context.lineTo(p3.x, p3.y);
-  context.stroke();
-  context.restore();
+  if (isActive) {
+    context.save();
+    context.setLineDash([8, 10]);
+    context.lineWidth = 1.5;
+    context.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    context.beginPath();
+    context.moveTo(p0.x, p0.y);
+    context.lineTo(p1.x, p1.y);
+    context.lineTo(p2.x, p2.y);
+    context.lineTo(p3.x, p3.y);
+    context.stroke();
+    context.restore();
+  }
 }
 
-function drawHandles(context) {
-  state.controlPoints.forEach((point, index) => {
+function drawHandles(context, set) {
+  set.controlPoints.forEach((point, index) => {
     context.fillStyle =
-      index === 0 || index === state.controlPoints.length - 1
-        ? "#2f85ff"
-        : "#ffb347";
+      index === 0 || index === set.controlPoints.length - 1
+        ? "#ffffff"
+        : set.color;
     context.strokeStyle = "rgba(0, 0, 0, 0.4)";
     context.lineWidth = 2;
     context.beginPath();
@@ -711,30 +866,30 @@ function drawHandles(context) {
   });
 }
 
-function drawPayload(context, point, t, showIndicator) {
-  const angle = getDirectionAngle(t);
+function drawPayload(context, set, point, t, showIndicator) {
+  const angle = getDirectionAngle(set, t);
   context.save();
   context.translate(point.x, point.y);
   context.rotate(angle);
 
-  if (state.artAsset.ready) {
+  if (set.artAsset.ready) {
     const largestDimension = Math.max(
       1,
-      state.artAsset.width,
-      state.artAsset.height
+      set.artAsset.width,
+      set.artAsset.height
     );
     const fit = 200 / largestDimension;
-    const width = state.artAsset.width * fit * state.artScale;
-    const height = state.artAsset.height * fit * state.artScale;
+    const width = set.artAsset.width * fit * set.artScale;
+    const height = set.artAsset.height * fit * set.artScale;
     context.drawImage(
-      state.artAsset.image,
+      set.artAsset.image,
       -width / 2,
       -height / 2,
       width,
       height
     );
   } else {
-    const size = 60 * state.artScale;
+    const size = 60 * set.artScale;
     context.fillStyle = "#ffffff";
     drawRoundedRect(context, -size / 2, -size / 3, size, (2 * size) / 3, size / 3);
     context.fillStyle = "#2f85ff";
@@ -745,26 +900,26 @@ function drawPayload(context, point, t, showIndicator) {
   context.restore();
 
   if (showIndicator) {
-    context.fillStyle = "#fff";
+    context.fillStyle = set.color;
     context.beginPath();
     context.arc(point.x, point.y, 4, 0, Math.PI * 2);
     context.fill();
   }
 }
 
-function getDirectionAngle(t) {
-  const tangent = cubicBezierTangent(t);
+function getDirectionAngle(set, t) {
+  const tangent = cubicBezierTangent(set, t);
   if (!tangent || (tangent.x === 0 && tangent.y === 0)) {
     const lookAhead = Math.min(0.9999, t + 0.001);
-    const current = cubicBezierPoint(t);
-    const ahead = cubicBezierPoint(lookAhead);
+    const current = cubicBezierPoint(set, t);
+    const ahead = cubicBezierPoint(set, lookAhead);
     return Math.atan2(ahead.y - current.y, ahead.x - current.x);
   }
   return Math.atan2(tangent.y, tangent.x);
 }
 
-function cubicBezierTangent(t) {
-  const [p0, p1, p2, p3] = state.controlPoints;
+function cubicBezierTangent(set, t) {
+  const [p0, p1, p2, p3] = set.controlPoints;
   const mt = 1 - t;
   const mt2 = mt * mt;
   const t2 = t * t;

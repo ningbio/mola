@@ -87,6 +87,98 @@ body {
   gap: 16px;
 }
 
+.animation-sets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.sets-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+
+.sets-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.sets-actions button {
+  flex: 1 1 120px;
+  white-space: nowrap;
+}
+
+.sets-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.smallprint {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.set-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.set-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  background: rgba(99, 179, 255, 0.05);
+  transition: border 0.15s ease, background 0.15s ease;
+}
+
+.set-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
+}
+
+.set-item[data-active="true"] {
+  border-color: var(--accent);
+  background: rgba(99, 179, 255, 0.12);
+}
+
+.set-item button {
+  all: unset;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+}
+
+.set-meta {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .stage {
   flex: 2 1 600px;
   padding: 18px;

@@ -30,6 +30,24 @@
 
       <main class="workspace">
         <section class="controls panel">
+          <section class="animation-sets">
+            <div class="sets-header">
+              <div>
+                <span class="eyebrow">Animation sets</span>
+                <h2>Multi-object timeline</h2>
+                <p class="smallprint">
+                  Each set owns its own curve, artwork, and scale. Add as many as
+                  you like and choreograph them together.
+                </p>
+              </div>
+              <div class="sets-actions">
+                <button id="addMolaBtn" type="button">Add mola</button>
+                <button id="addJellyBtn" type="button">Add jelly</button>
+              </div>
+            </div>
+            <ul id="setList" class="set-list"></ul>
+          </section>
+
           <fieldset>
             <legend>Artwork</legend>
             <label class="file-input">
@@ -87,7 +105,11 @@
             <h2>How to use</h2>
             <ol>
               <li>Drag any control point to sculpt the cubic Bézier path.</li>
-              <li>Load your SVG or PNG and adjust its scale.</li>
+              <li>Select a set and load your SVG or PNG, then tweak its scale.</li>
+              <li>
+                Use <strong>Add mola</strong> or <strong>Add jelly</strong> to seed
+                more artwork instantly.
+              </li>
               <li>Tap <strong>Animate</strong> to preview the motion.</li>
               <li>Export the loop as a GIF whenever you like.</li>
             </ol>
