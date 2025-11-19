@@ -126,6 +126,19 @@ body {
   font-size: 0.85rem;
   color: var(--text-soft);
 }
+.smallprint span {
+  color: var(--text);
+}
+
+.background-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.background-actions button {
+  flex: 1 1 140px;
+}
 
 .set-list {
   list-style: none;

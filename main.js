@@ -7,6 +7,10 @@ const scaleSlider = document.getElementById("scaleSlider");
 const speedSlider = document.getElementById("speedSlider");
 const scaleValue = document.getElementById("scaleValue");
 const speedValue = document.getElementById("speedValue");
+const backgroundBtn = document.getElementById("backgroundBtn");
+const clearBackgroundBtn = document.getElementById("clearBackgroundBtn");
+const backgroundInput = document.getElementById("backgroundInput");
+const backgroundName = document.getElementById("backgroundName");
 const animateBtn = document.getElementById("animateBtn");
 const exportGifBtn = document.getElementById("exportGifBtn");
 const resetCurveBtn = document.getElementById("resetCurveBtn");
@@ -37,6 +41,10 @@ const PRESET_ARTWORKS = {
   },
 };
 
+const DEFAULT_BACKGROUND_URL = "./background.jpg";
+const DEFAULT_BACKGROUND_NAME = "background.jpg";
+const EXPORT_GIF_SCALE = 0.65;
+
 const state = {
   sets: [],
   activeSetId: null,
@@ -53,6 +61,11 @@ const state = {
   gifWorkerUrl: null,
   gifWorkerPromise: null,
   loopAnimation: true,
+  background: {
+    image: null,
+    name: "background.jpg",
+    ready: false,
+  },
 };
 
 const DEFAULT_POINTS = [
@@ -172,6 +185,7 @@ function init() {
   handleSpeedChange({ target: speedSlider });
   loopToggle.checked = state.loopAnimation;
   handleAddPresetSet("mola", { silent: true });
+  loadDefaultBackground();
   setStatus("Drop in artwork, add more sets, and choreograph them together.");
 }
 
@@ -180,6 +194,9 @@ function attachEventListeners() {
   scaleSlider.addEventListener("input", handleScaleChange);
   speedSlider.addEventListener("input", handleSpeedChange);
   loopToggle.addEventListener("change", handleLoopToggle);
+  backgroundBtn.addEventListener("click", () => backgroundInput?.click());
+  clearBackgroundBtn.addEventListener("click", handleClearBackground);
+  backgroundInput.addEventListener("change", handleBackgroundUpload);
   addMolaBtn.addEventListener("click", () => handleAddPresetSet("mola"));
   addJellyBtn.addEventListener("click", () => handleAddPresetSet("jelly"));
   animateBtn.addEventListener("click", toggleAnimation);
@@ -575,6 +592,62 @@ function handleAddPresetSet(key, options = {}) {
     });
 }
 
+function setBackgroundImage(image, name) {
+  state.background.image = image;
+  state.background.name = name;
+  state.background.ready = true;
+  if (backgroundName) {
+    backgroundName.textContent = name;
+  }
+  renderScene();
+}
+
+function loadDefaultBackground() {
+  loadImageFromUrl(DEFAULT_BACKGROUND_URL)
+    .then((image) => {
+      setBackgroundImage(image, DEFAULT_BACKGROUND_NAME);
+      setStatus("Background ready. You can swap it anytime.");
+    })
+    .catch((error) => {
+      console.warn("Could not load default background", error);
+    });
+}
+
+function clearBackgroundImage() {
+  state.background.image = null;
+  state.background.name = "None";
+  state.background.ready = false;
+  if (backgroundName) {
+    backgroundName.textContent = "None";
+  }
+  renderScene();
+}
+
+async function handleBackgroundUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    setStatus("Please choose an image file for the background.", "error");
+    event.target.value = "";
+    return;
+  }
+  try {
+    const image = await loadImageFromBlob(file);
+    setBackgroundImage(image, file.name);
+    setStatus(`Background updated to ${file.name}`, "success");
+  } catch (error) {
+    console.error(error);
+    setStatus("Could not load that background image.", "error");
+  } finally {
+    event.target.value = "";
+  }
+}
+
+function handleClearBackground() {
+  clearBackgroundImage();
+  setStatus("Background cleared. Canvas is now transparent.", "success");
+}
+
 function toggleAnimation() {
   if (state.isAnimating) {
     stopAnimation();
@@ -787,8 +860,9 @@ function renderScene(targetCtx = ctx, options = {}) {
 
   context.save();
   context.clearRect(0, 0, width, height);
+  drawBackground(context, width, height);
   if (showBackdrop) {
-    drawBackdrop(context, width, height);
+    drawHelperGrid(context, width, height);
   }
   if (showCurve) {
     state.sets.forEach((set) => {
@@ -809,7 +883,23 @@ function renderScene(targetCtx = ctx, options = {}) {
   context.restore();
 }
 
-function drawBackdrop(context, width, height) {
+function drawBackground(context, width, height) {
+  const bg = state.background;
+  if (bg.image) {
+    const img = bg.image;
+    const scale = Math.max(width / img.width, height / img.height);
+    const drawWidth = img.width * scale;
+    const drawHeight = img.height * scale;
+    const offsetX = (width - drawWidth) / 2;
+    const offsetY = (height - drawHeight) / 2;
+    context.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+  } else {
+    context.fillStyle = "#03050d";
+    context.fillRect(0, 0, width, height);
+  }
+}
+
+function drawHelperGrid(context, width, height) {
   context.strokeStyle = "rgba(255, 255, 255, 0.09)";
   context.lineWidth = 1;
   context.setLineDash([2, 38]);
@@ -985,10 +1075,17 @@ async function exportGif() {
     return;
   }
 
-  const offscreen = document.createElement("canvas");
-  offscreen.width = canvas.width;
-  offscreen.height = canvas.height;
-  const offCtx = offscreen.getContext("2d");
+  const renderCanvas = document.createElement("canvas");
+  renderCanvas.width = canvas.width;
+  renderCanvas.height = canvas.height;
+  const renderCtx = renderCanvas.getContext("2d");
+
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = Math.round(canvas.width * EXPORT_GIF_SCALE);
+  exportCanvas.height = Math.round(canvas.height * EXPORT_GIF_SCALE);
+  const exportCtx = exportCanvas.getContext("2d");
+  exportCtx.imageSmoothingEnabled = true;
+
   const duration = state.baseDuration / state.playbackSpeed;
   const durationSeconds = duration / 1000;
   const targetFps = 30;
@@ -999,19 +1096,27 @@ async function exportGif() {
     workerScript: workerScriptUrl,
     workers: 2,
     quality: 8,
-    width: offscreen.width,
-    height: offscreen.height,
+    width: exportCanvas.width,
+    height: exportCanvas.height,
   });
 
   for (let i = 0; i < frameCount; i += 1) {
     const progress = frameCount === 1 ? 1 : i / (frameCount - 1);
-    renderScene(offCtx, {
+    renderScene(renderCtx, {
       progress,
       showHandles: false,
       showCurve: false,
       showBackdrop: false,
     });
-    gif.addFrame(offCtx, { copy: true, delay });
+    exportCtx.clearRect(0, 0, exportCanvas.width, exportCanvas.height);
+    exportCtx.drawImage(
+      renderCanvas,
+      0,
+      0,
+      exportCanvas.width,
+      exportCanvas.height
+    );
+    gif.addFrame(exportCtx, { copy: true, delay });
   }
 
   gif.on("progress", (value) => {

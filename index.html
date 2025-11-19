@@ -75,6 +75,23 @@
           </fieldset>
 
           <fieldset>
+            <legend>Background</legend>
+            <p class="smallprint">
+              Current: <span id="backgroundName">background.jpg</span>
+            </p>
+            <div class="background-actions">
+              <button id="backgroundBtn" type="button">Change background</button>
+              <button id="clearBackgroundBtn" type="button">Blank background</button>
+            </div>
+            <input
+              type="file"
+              id="backgroundInput"
+              accept="image/*"
+              hidden
+            />
+          </fieldset>
+
+          <fieldset>
             <legend>Motion</legend>
             <div class="field">
               <label for="speedSlider">Playback speed</label>
