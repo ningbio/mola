@@ -8,7 +8,7 @@ const speedSlider = document.getElementById("speedSlider");
 const scaleValue = document.getElementById("scaleValue");
 const speedValue = document.getElementById("speedValue");
 const backgroundBtn = document.getElementById("backgroundBtn");
-const clearBackgroundBtn = document.getElementById("clearBackgroundBtn");
+const toggleBackgroundBtn = document.getElementById("toggleBackgroundBtn");
 const backgroundInput = document.getElementById("backgroundInput");
 const backgroundName = document.getElementById("backgroundName");
 const animateBtn = document.getElementById("animateBtn");
@@ -65,6 +65,7 @@ const state = {
     image: null,
     name: "background.jpg",
     ready: false,
+    enabled: true,
   },
 };
 
@@ -185,6 +186,7 @@ function init() {
   handleSpeedChange({ target: speedSlider });
   loopToggle.checked = state.loopAnimation;
   handleAddPresetSet("mola", { silent: true });
+  updateBackgroundToggleLabel();
   loadDefaultBackground();
   setStatus("Drop in artwork, add more sets, and choreograph them together.");
 }
@@ -195,7 +197,7 @@ function attachEventListeners() {
   speedSlider.addEventListener("input", handleSpeedChange);
   loopToggle.addEventListener("change", handleLoopToggle);
   backgroundBtn.addEventListener("click", () => backgroundInput?.click());
-  clearBackgroundBtn.addEventListener("click", handleClearBackground);
+  toggleBackgroundBtn.addEventListener("click", handleToggleBackground);
   backgroundInput.addEventListener("change", handleBackgroundUpload);
   addMolaBtn.addEventListener("click", () => handleAddPresetSet("mola"));
   addJellyBtn.addEventListener("click", () => handleAddPresetSet("jelly"));
@@ -596,9 +598,11 @@ function setBackgroundImage(image, name) {
   state.background.image = image;
   state.background.name = name;
   state.background.ready = true;
+  state.background.enabled = true;
   if (backgroundName) {
     backgroundName.textContent = name;
   }
+  updateBackgroundToggleLabel();
   renderScene();
 }
 
@@ -610,17 +614,8 @@ function loadDefaultBackground() {
     })
     .catch((error) => {
       console.warn("Could not load default background", error);
+      updateBackgroundToggleLabel();
     });
-}
-
-function clearBackgroundImage() {
-  state.background.image = null;
-  state.background.name = "None";
-  state.background.ready = false;
-  if (backgroundName) {
-    backgroundName.textContent = "None";
-  }
-  renderScene();
 }
 
 async function handleBackgroundUpload(event) {
@@ -643,9 +638,33 @@ async function handleBackgroundUpload(event) {
   }
 }
 
-function handleClearBackground() {
-  clearBackgroundImage();
-  setStatus("Background cleared. Canvas is now transparent.", "success");
+function updateBackgroundToggleLabel() {
+  if (!toggleBackgroundBtn) return;
+  const bg = state.background;
+  if (!bg.ready) {
+    toggleBackgroundBtn.textContent = "Show background";
+    toggleBackgroundBtn.disabled = true;
+    return;
+  }
+  toggleBackgroundBtn.disabled = false;
+  toggleBackgroundBtn.textContent = bg.enabled
+    ? "Hide background"
+    : "Show background";
+}
+
+function handleToggleBackground() {
+  const bg = state.background;
+  if (!bg.ready) {
+    setStatus("No background loaded yet.", "error");
+    return;
+  }
+  bg.enabled = !bg.enabled;
+  updateBackgroundToggleLabel();
+  setStatus(
+    bg.enabled ? "Background visible again." : "Background hidden.",
+    "success"
+  );
+  renderScene();
 }
 
 function toggleAnimation() {
@@ -885,7 +904,7 @@ function renderScene(targetCtx = ctx, options = {}) {
 
 function drawBackground(context, width, height) {
   const bg = state.background;
-  if (bg.image) {
+  if (bg.enabled && bg.image) {
     const img = bg.image;
     const scale = Math.max(width / img.width, height / img.height);
     const drawWidth = img.width * scale;
@@ -893,10 +912,9 @@ function drawBackground(context, width, height) {
     const offsetX = (width - drawWidth) / 2;
     const offsetY = (height - drawHeight) / 2;
     context.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-  } else {
-    context.fillStyle = "#03050d";
-    context.fillRect(0, 0, width, height);
   }
+  // If background disabled or missing, leave transparent; helper grid/background
+  // fill will handle appearance when editing.
 }
 
 function drawHelperGrid(context, width, height) {
