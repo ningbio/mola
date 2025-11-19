@@ -15,11 +15,9 @@
     <div class="app-shell">
       <header class="app-header">
         <div>
-          <p class="eyebrow">Playground</p>
           <h1>Yoyo's Path Animator</h1>
           <p>
-            Load an image, shape a motion curve directly on the canvas,
-            and export the animation as a GIF.
+            Load an image, shape a motion curve directly on the canvas, and export the animation as a GIF.
           </p>
         </div>
         <div class="header-actions">
@@ -34,10 +32,9 @@
             <div class="sets-header">
               <div>
                 <span class="eyebrow">Animation sets</span>
-                <h2>Multi-object timeline</h2>
                 <p class="smallprint">
                   Each set owns its own curve, artwork, and scale. Add as many as
-                  you like and choreograph them together.
+                  you like and choreograph them together. Select a set first to edit its curve.
                 </p>
               </div>
               <div class="sets-actions">
@@ -109,9 +106,6 @@
                 <span id="speedValue">1.0×</span>
               </div>
             </div>
-            <div class="field">
-              <button id="resetCurveBtn" type="button">Reset curve</button>
-            </div>
             <div class="field checkbox-field">
               <label>
                 <input type="checkbox" id="loopToggle" checked />
@@ -121,21 +115,26 @@
           </fieldset>
 
           <section class="instructions panel">
-            <h2>How to use</h2>
-            <ol>
-              <li>Drag any control point to sculpt the cubic Bézier path.</li>
-              <li>Select a set and load your SVG or PNG, then tweak its scale.</li>
-              <li>
-                Use <strong>Add mola</strong> or <strong>Add jelly</strong> to seed
-                more artwork instantly.
-              </li>
-              <li>Tap <strong>Animate</strong> to preview the motion.</li>
-              <li>Export the loop as a GIF whenever you like.</li>
-            </ol>
-            <p class="note">
-              Tip: Hold and drag on either of the middle handles to fine‑tune
-              the tangents.
-            </p>
+            <button id="toggleInstructions" type="button" class="plain">
+              How to use
+              <span aria-hidden="true">▾</span>
+            </button>
+            <div id="instructionsBody" hidden>
+              <ol>
+                <li>Drag any control point to sculpt the cubic Bézier path.</li>
+                <li>Select a set and load your SVG or PNG, then tweak its scale.</li>
+                <li>
+                  Use <strong>Add mola</strong> or <strong>Add jelly</strong> to
+                  seed more artwork instantly.
+                </li>
+                <li>Tap <strong>Animate</strong> to preview the motion.</li>
+                <li>Export the loop as a GIF whenever you like.</li>
+              </ol>
+              <p class="note">
+                Tip: Hold and drag on either of the middle handles to fine-tune
+                the tangents.
+              </p>
+            </div>
           </section>
         </section>
 

@@ -11,9 +11,10 @@ const backgroundBtn = document.getElementById("backgroundBtn");
 const toggleBackgroundBtn = document.getElementById("toggleBackgroundBtn");
 const backgroundInput = document.getElementById("backgroundInput");
 const backgroundName = document.getElementById("backgroundName");
+const toggleInstructionsBtn = document.getElementById("toggleInstructions");
+const instructionsBody = document.getElementById("instructionsBody");
 const animateBtn = document.getElementById("animateBtn");
 const exportGifBtn = document.getElementById("exportGifBtn");
-const resetCurveBtn = document.getElementById("resetCurveBtn");
 const loopToggle = document.getElementById("loopToggle");
 const setListEl = document.getElementById("setList");
 const addMolaBtn = document.getElementById("addMolaBtn");
@@ -203,12 +204,23 @@ function attachEventListeners() {
   addJellyBtn.addEventListener("click", () => handleAddPresetSet("jelly"));
   animateBtn.addEventListener("click", toggleAnimation);
   exportGifBtn.addEventListener("click", exportGif);
-  resetCurveBtn.addEventListener("click", resetCurve);
 
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerup", onPointerUp);
   canvas.addEventListener("pointerleave", onPointerUp);
+
+  toggleInstructionsBtn?.addEventListener("click", () => {
+    if (!instructionsBody) return;
+    const isHidden = instructionsBody.hasAttribute("hidden");
+    if (isHidden) {
+      instructionsBody.removeAttribute("hidden");
+      toggleInstructionsBtn.querySelector("span").textContent = "▴";
+    } else {
+      instructionsBody.setAttribute("hidden", "true");
+      toggleInstructionsBtn.querySelector("span").textContent = "▾";
+    }
+  });
 }
 
 async function handleAssetUpload(event) {
@@ -722,19 +734,6 @@ function stepAnimation(timestamp) {
   }
 
   state.rafId = requestAnimationFrame(stepAnimation);
-}
-
-function resetCurve() {
-  const set = getActiveSet();
-  if (!set) {
-    setStatus("No active set to reset.", "error");
-    return;
-  }
-  set.controlPoints = DEFAULT_POINTS.map((pt) => ({ ...pt }));
-  buildArcTable(set);
-  state.currentProgress = 0;
-  renderScene();
-  setStatus(`${set.name} curve reset to default.`, "success");
 }
 
 function onPointerDown(event) {

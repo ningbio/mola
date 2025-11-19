@@ -22,15 +22,18 @@ body {
   min-height: 100vh;
   background: radial-gradient(circle at top, #182032, #05060c 60%);
   color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .app-shell {
+  font-size: 0.9rem;
   width: min(1200px, 100%);
   margin: 0 auto;
-  padding: 32px clamp(16px, 3vw, 32px) 48px;
+  padding: 24px clamp(12px, 2.5vw, 28px) 36px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
 }
 
 .app-header {
@@ -80,20 +83,20 @@ body {
 }
 
 .controls {
-  flex: 1 1 280px;
-  padding: 20px;
+  flex: 1 1 240px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .animation-sets {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.01);
 }
 
@@ -132,12 +135,14 @@ body {
 
 .background-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .background-actions button {
-  flex: 1 1 140px;
+  flex: 1 1 110px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
 }
 
 .set-list {
@@ -194,7 +199,7 @@ body {
 
 .stage {
   flex: 2 1 600px;
-  padding: 18px;
+  padding: 14px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -267,12 +272,17 @@ input[type="range"] {
 }
 
 .instructions {
-  padding: 18px;
+  padding: 14px;
 }
 
-.instructions h2 {
-  margin: 0 0 10px;
-  font-size: 1rem;
+.instructions button.plain {
+  all: unset;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
 }
 
 .instructions ol {
